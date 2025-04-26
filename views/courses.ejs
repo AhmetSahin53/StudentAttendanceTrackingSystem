@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dersler - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <h1>Tüm Dersler</h1>
+    
+    <% if (courses.length === 0) { %>
+      <p>Henüz ders bulunmamaktadır.</p>
+    <% } else { %>
+      <div class="courses-grid">
+        <% courses.forEach(course => { %>
+          <div class="course-card">
+            <h3><%= course.course_name %></h3>
+            <p class="course-code"><%= course.course_code %></p>
+            
+            <div class="course-actions">
+              <a href="/course/<%= course.id %>" class="btn small">Detaylar</a>
+              
+              <% if (user.role === 'student') { %>
+                <form action="/enroll" method="POST">
+                  <input type="hidden" name="courseId" value="<%= course.id %>">
+                  <button type="submit" class="btn primary small">Kaydol</button>
+                </form>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

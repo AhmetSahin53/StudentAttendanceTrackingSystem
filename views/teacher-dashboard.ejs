@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Öğretmen Paneli - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <h1>Hoş Geldin, <%= user.fullName %></h1>
+    
+    <div class="dashboard-cards">
+      <div class="dashboard-card">
+        <h2>Derslerim</h2>
+        
+        <% if (courses.length === 0) { %>
+          <p>Henüz bir ders oluşturmadınız.</p>
+        <% } else { %>
+          <ul class="course-list">
+            <% courses.forEach(course => { %>
+              <li>
+                <div class="course-info">
+                  <h3><%= course.course_name %></h3>
+                  <p><%= course.course_code %></p>
+                </div>
+                <div class="course-actions">
+                  <a href="/course/<%= course.id %>" class="btn small">Detaylar</a>
+                  <a href="/attendance-report/<%= course.id %>" class="btn secondary small">Yoklama Raporu</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+    
+    <div class="dashboard-actions">
+      <a href="/create-course" class="btn primary">Yeni Ders Oluştur</a>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

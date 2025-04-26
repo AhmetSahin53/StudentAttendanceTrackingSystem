@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="hero">
+      <h1>Kocaeli Üniversitesi Online Yoklama Sistemi</h1>
+      
+      
+      <% if (!user) { %>
+        <div class="cta-buttons">
+          <a href="/login" class="btn primary">Giriş Yap</a>
+          <a href="/register" class="btn secondary">Kayıt Ol</a>
+        </div>
+      <% } else { %>
+        <div class="cta-buttons">
+          <a href="/dashboard" class="btn primary">Panele Git</a>
+        </div>
+      <% } %>
+    </div>
+    
+    <section class="features">
+      <div class="feature-card">
+        <h3>Hızlı Yoklama</h3>
+        <p>Öğrenciler için kolay ve hızlı yoklama alma sistemi</p>
+      </div>
+      
+      <div class="feature-card">
+        <h3>Gerçek Zamanlı Takip</h3>
+        <p>Öğretmenler için anlık yoklama takibi</p>
+      </div>
+      
+      <div class="feature-card">
+        <h3>Detaylı Raporlar</h3>
+        <p>Derse katılım istatistikleri ve raporları</p>
+      </div>
+    </section>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

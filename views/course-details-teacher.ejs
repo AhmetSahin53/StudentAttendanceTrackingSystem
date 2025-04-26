@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= course.course_name %> - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="course-header">
+      <h1><%= course.course_name %></h1>
+      <p class="course-code"><%= course.course_code %></p>
+    </div>
+    
+    <div class="course-details">
+      <div class="students-card">
+        <h2>Öğrenciler</h2>
+        
+        <% if (students.length === 0) { %>
+          <p>Bu derse henüz öğrenci kaydı bulunmamaktadır.</p>
+        <% } else { %>
+          <table class="students-table">
+            <thead>
+              <tr>
+                <th>Öğrenci Adı</th>
+                <th>Katılım Sayısı</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% students.forEach(student => { %>
+                <tr>
+                  <td><%= student.full_name %></td>
+                  <td><%= student.present_count %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% } %>
+        
+        <div class="course-actions">
+          <a href="/attendance-report/<%= course.id %>" class="btn secondary">Detaylı Yoklama Raporu</a>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

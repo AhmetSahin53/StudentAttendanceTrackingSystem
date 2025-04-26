@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yoklama Raporu - <%= course.course_name %> - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="report-header">
+      <h1>Yoklama Raporu: <%= course.course_name %></h1>
+    </div>
+    
+    <div class="report-content">
+      <% if (attendanceRecords.length === 0) { %>
+        <p>Bu ders için henüz yoklama kaydı bulunmamaktadır.</p>
+      <% } else { %>
+        <table class="attendance-report-table">
+          <thead>
+            <tr>
+              <th>Öğrenci Adı</th>
+              <th>Tarih</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% attendanceRecords.forEach(record => { %>
+              <tr>
+                <td><%= record.full_name %></td>
+                <td><%= new Date(record.date).toLocaleDateString('tr-TR') %></td>
+                <td class="<%= record.status === 'present' ? 'present' : 'absent' %>">
+                  <%= record.status === 'present' ? 'Var' : 'Yok' %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+      
+      <div class="report-actions">
+        <button class="btn secondary" onclick="window.print()">Raporu Yazdır</button>
+        <a href="/course/<%= courseId %>" class="btn">Derse Dön</a>
+      </div>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

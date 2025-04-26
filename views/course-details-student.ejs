@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= course.course_name %> - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="course-header">
+      <h1><%= course.course_name %></h1>
+      <p class="course-code"><%= course.course_code %></p>
+    </div>
+    
+    <div class="course-details">
+      <div class="attendance-card">
+        <h2>Yoklama Durumum</h2>
+        
+        <form action="/mark-attendance" method="POST" class="mark-attendance">
+          <input type="hidden" name="courseId" value="<%= course.id %>">
+          <button type="submit" class="btn primary">Bugün Yoklama Al</button>
+        </form>
+        
+        <h3>Yoklama Geçmişi</h3>
+        
+        <% if (attendance.length === 0) { %>
+          <p>Henüz yoklama kaydınız bulunmamaktadır.</p>
+        <% } else { %>
+          <table class="attendance-table">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% attendance.forEach(record => { %>
+                <tr>
+                  <td><%= new Date(record.date).toLocaleDateString('tr-TR') %></td>
+                  <td class="<%= record.status === 'present' ? 'present' : 'absent' %>">
+                    <%= record.status === 'present' ? 'Var' : 'Yok' %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

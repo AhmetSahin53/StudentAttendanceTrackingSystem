@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Öğrenci Paneli - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <h1>Hoş Geldin, <%= user.fullName %></h1>
+    
+    <div class="dashboard-cards">
+      <div class="dashboard-card">
+        <h2>Derslerim</h2>
+        
+        <% if (courses.length === 0) { %>
+          <p>Henüz bir derse kayıtlı değilsiniz.</p>
+          <a href="/courses" class="btn secondary">Derslere Göz At</a>
+        <% } else { %>
+          <ul class="course-list">
+            <% courses.forEach(course => { %>
+              <li>
+                <div class="course-info">
+                  <h3><%= course.course_name %></h3>
+                  <p><%= course.course_code %></p>
+                </div>
+                <div class="course-actions">
+                  <a href="/course/<%= course.id %>" class="btn small">Detaylar</a>
+                  <form action="/mark-attendance" method="POST">
+                    <input type="hidden" name="courseId" value="<%= course.id %>">
+                    <button type="submit" class="btn primary small">Yoklama Al</button>
+                  </form>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+    
+    <div class="dashboard-actions">
+      <a href="/courses" class="btn secondary">Tüm Dersleri Görüntüle</a>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

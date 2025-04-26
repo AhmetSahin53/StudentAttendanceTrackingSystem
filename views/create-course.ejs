@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yeni Ders Oluştur - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="form-container">
+      <h1>Yeni Ders Oluştur</h1>
+      
+      <% if (error) { %>
+        <div class="alert error">
+          <%= error %>
+        </div>
+      <% } %>
+      
+      <form action="/create-course" method="POST">
+        <div class="form-group">
+          <label for="courseCode">Ders Kodu</label>
+          <input type="text" id="courseCode" name="courseCode" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="courseName">Ders Adı</label>
+          <input type="text" id="courseName" name="courseName" required>
+        </div>
+        
+        <button type="submit" class="btn primary full-width">Ders Oluştur</button>
+      </form>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>

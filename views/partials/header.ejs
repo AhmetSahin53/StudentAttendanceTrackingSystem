@@ -1,0 +1,24 @@
+<header class="main-header">
+  <div class="container">
+    <div class="logo">
+      <a href="/">
+        <h1>Kocaeli Üniversitesi<span>Online Yoklama Sistemi</span></h1>
+      </a>
+    </div>
+    
+    <nav class="main-nav">
+      <ul>
+        <li><a href="/">Ana Sayfa</a></li>
+        
+        <% if (typeof user !== 'undefined' && user) { %>
+          <li><a href="/dashboard">Panel</a></li>
+          <li><a href="/courses">Dersler</a></li>
+          <li><a href="/logout">Çıkış Yap</a></li>
+        <% } else { %>
+          <li><a href="/login">Giriş Yap</a></li>
+          <li><a href="/register">Kayıt Ol</a></li>
+        <% } %>
+      </ul>
+    </nav>
+  </div>
+</header>

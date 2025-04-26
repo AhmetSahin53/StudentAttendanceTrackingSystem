@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hata - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="error-container">
+      <h1>Hata</h1>
+      <p><%= message %></p>
+      <a href="javascript:history.back()" class="btn secondary">Geri Dön</a>
+      <a href="/" class="btn primary">Ana Sayfaya Git</a>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>
