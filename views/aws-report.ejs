@@ -1,0 +1,83 @@
+<%- include('header', { title: 'AWS Rapor Oluşturma' }) %>
+
+<div class="container mt-4">
+  <h1>AWS Rapor Oluşturma</h1>
+  
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Yoklama Raporu Oluştur</h5>
+      
+      <form id="reportForm">
+        <input type="hidden" name="courseId" value="<%= courseId %>">
+        
+        <div class="mb-3">
+          <label for="startDate" class="form-label">Başlangıç Tarihi</label>
+          <input type="date" class="form-control" id="startDate" name="startDate" value="<%= startDate %>" required>
+        </div>
+        
+        <div class="mb-3">
+          <label for="endDate" class="form-label">Bitiş Tarihi</label>
+          <input type="date" class="form-control" id="endDate" name="endDate" value="<%= endDate %>" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Rapor Oluştur</button>
+      </form>
+      
+      <div id="reportResult" class="mt-4" style="display: none;">
+        <div class="alert alert-success">
+          <h5>Rapor Başarıyla Oluşturuldu!</h5>
+          <p>Toplam Kayıt: <span id="recordCount">0</span></p>
+          <a href="#" id="reportLink" target="_blank" class="btn btn-sm btn-success">Raporu İndir</a>
+        </div>
+      </div>
+      
+      <div id="reportError" class="mt-4 alert alert-danger" style="display: none;">
+        Rapor oluşturulurken bir hata oluştu.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('reportForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const courseId = document.querySelector('input[name="courseId"]').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    try {
+      const response = await fetch('/api/attendance/report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId,
+          startDate,
+          endDate
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        document.getElementById('recordCount').textContent = data.recordCount;
+        document.getElementById('reportLink').href = data.reportUrl;
+        document.getElementById('reportResult').style.display = 'block';
+        document.getElementById('reportError').style.display = 'none';
+      } else {
+        document.getElementById('reportError').textContent = data.message || 'Rapor oluşturulurken bir hata oluştu.';
+        document.getElementById('reportError').style.display = 'block';
+        document.getElementById('reportResult').style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Rapor oluşturma hatası:', error);
+      document.getElementById('reportError').textContent = 'Sunucu hatası oluştu.';
+      document.getElementById('reportError').style.display = 'block';
+      document.getElementById('reportResult').style.display = 'none';
+    }
+  });
+</script>
+
+<%- include('footer') %>

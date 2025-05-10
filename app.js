@@ -3,8 +3,20 @@ const mysql = require("mysql2")
 const session = require("express-session")
 const bcrypt = require("bcrypt")
 const path = require("path")
+require('dotenv').config();
 const app = express()
-const port = 4000
+const port = process.env.PORT || 4000
+
+// AWS Servisleri
+const s3Service = require("./services/s3-service")
+const snsService = require("./services/sns-service")
+const rdsService = require("./services/rds-service")
+const deviceService = require("./services/device-service")
+const locationService = require("./services/location-service")
+const reportService = require("./services/report-service")
+
+// API Routes
+const apiRoutes = require("./routes/api")
 
 // Middleware setup
 app.use(express.urlencoded({ extended: true }))
@@ -13,23 +25,22 @@ app.use(express.static(path.join(__dirname, "public")))
 app.set("view engine", "ejs")
 app.set("views", path.join(__dirname, "views"))
 
-// Session setupc
+// Session setup
 app.use(
   session({
-    secret: "firat-university-attendance-secret",
+    secret: process.env.SESSION_SECRET || "firat-university-attendance-secret",
     resave: false,
     saveUninitialized: true,
     cookie: { maxAge: 3600000 }, // 1 hour
   }),
 )
 
-// Replace the database connection and table creation code with a simpler connection
 // Database connection
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "sanane53",
-  database: "attendance_system2",
+  host: process.env.RDS_HOSTNAME || "localhost",
+  user: process.env.RDS_USERNAME || "root",
+  password: process.env.RDS_PASSWORD || "sanane53",
+  database: process.env.RDS_DB_NAME || "attendance_system2",
   multipleStatements: true,
 })
 
@@ -39,6 +50,80 @@ db.connect((err) => {
     return
   }
   console.log("Connected to database")
+
+  // Create users table
+  const createUsersTable = `
+    CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  full_name VARCHAR(100) NOT NULL,
+  role ENUM('student', 'teacher') NOT NULL,
+  email VARCHAR(100)
+)
+
+  `
+
+  db.query(createUsersTable, (err) => {
+    if (err) throw err
+    console.log("Users table created or already exists")
+
+    // Create courses table
+    const createCoursesTable = `
+      CREATE TABLE IF NOT EXISTS courses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        course_code VARCHAR(20) UNIQUE NOT NULL,
+        course_name VARCHAR(100) NOT NULL,
+        teacher_id INT,
+        FOREIGN KEY (teacher_id) REFERENCES users(id)
+      )
+    `
+
+    db.query(createCoursesTable, (err) => {
+      if (err) throw err
+      console.log("Courses table created or already exists")
+
+      // Create enrollments table
+      const createEnrollmentsTable = `
+        CREATE TABLE IF NOT EXISTS enrollments (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          student_id INT,
+          course_id INT,
+          FOREIGN KEY (student_id) REFERENCES users(id),
+          FOREIGN KEY (course_id) REFERENCES courses(id),
+          UNIQUE KEY unique_enrollment (student_id, course_id)
+        )
+      `
+
+      db.query(createEnrollmentsTable, (err) => {
+        if (err) throw err
+        console.log("Enrollments table created or already exists")
+
+        // Create attendance table
+        const createAttendanceTable = `
+          CREATE TABLE IF NOT EXISTS attendance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            student_id INT,
+            course_id INT,
+            date DATE NOT NULL,
+            status ENUM('present', 'absent') DEFAULT 'present',
+            location_lat DECIMAL(10, 8) NULL,
+            location_lon DECIMAL(11, 8) NULL,
+            device_id VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id),
+            FOREIGN KEY (course_id) REFERENCES courses(id),
+            UNIQUE KEY unique_attendance (student_id, course_id, date)
+          )
+        `
+
+        db.query(createAttendanceTable, (err) => {
+          if (err) throw err
+          console.log("Attendance table created or already exists")
+        })
+      })
+    })
+  })
 })
 
 // Authentication middleware
@@ -55,6 +140,9 @@ const isTeacher = (req, res, next) => {
   }
   res.status(403).render("error", { message: "Yetkiniz yok" })
 }
+
+// API Routes
+app.use("/api", apiRoutes)
 
 // Routes
 app.get("/", (req, res) => {
@@ -89,6 +177,16 @@ app.post("/login", (req, res) => {
       role: user.role,
     }
 
+    // Kullanıcı girişi bildirimini SNS ile gönder
+    try {
+      await snsService.sendNotification(
+        `Kullanıcı ${user.full_name} (${user.username}) sisteme giriş yaptı.`,
+        "Kullanıcı Girişi",
+      )
+    } catch (error) {
+      console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+    }
+
     res.redirect("/dashboard")
   })
 })
@@ -98,29 +196,61 @@ app.get("/register", (req, res) => {
 })
 
 app.post("/register", async (req, res) => {
-  const { username, password, fullName, role } = req.body
+  const { username, password, fullName, role, email } = req.body;
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     db.query(
-      "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
-      [username, hashedPassword, fullName, role],
-      (err) => {
+      "INSERT INTO users (username, password, full_name, role, email) VALUES (?, ?, ?, ?, ?)",
+      [username, hashedPassword, fullName, role, email],
+      async (err, result) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY") {
-            return res.render("register", { error: "Bu kullanıcı adı zaten kullanılıyor" })
+            return res.render("register", { error: "Bu kullanıcı adı veya email zaten kullanılıyor" });
           }
-          throw err
+          throw err;
         }
 
-        res.redirect("/login")
-      },
-    )
+        // Kullanıcı ID'sini al
+        const userId = result.insertId;
+
+        // Email varsa SNS'e abone et
+        if (email) {
+          try {
+            await snsService.subscribeEmail(email);
+            console.log(`${email} adresi bildirim sistemine abone edildi`);
+          } catch (snsError) {
+            console.error("SNS aboneliği sırasında hata:", snsError);
+            // Abonelik hatası kullanıcı kaydını engellememelidir
+          }
+        }
+
+        // Bildirim oluştur ve veritabanına kaydet
+        try {
+          const notificationTitle = "Hoş Geldiniz";
+          const notificationMessage = `Sayın ${fullName}, Kocaeli Üniversitesi Online Yoklama Sistemine hoş geldiniz!`;
+          
+          // Veritabanına bildirim kaydet
+          await snsService.saveNotificationToDb(userId, notificationTitle, notificationMessage, db);
+          
+          // SNS ile bildirim gönder (admin için)
+          await snsService.sendNotification(
+            `Yeni kullanıcı kaydı: ${fullName} (${username}) - Rol: ${role}`,
+            "Yeni Kullanıcı Kaydı"
+          );
+        } catch (notifError) {
+          console.error("Bildirim oluşturulurken hata:", notifError);
+        }
+
+        res.redirect("/login");
+      }
+    );
   } catch (err) {
-    res.render("register", { error: "Kayıt sırasında bir hata oluştu" })
+    console.error("Kayıt işlemi sırasında hata:", err);
+    res.render("register", { error: "Kayıt sırasında bir hata oluştu" });
   }
-})
+});
 
 app.get("/dashboard", isAuthenticated, (req, res) => {
   const user = req.session.user
@@ -211,6 +341,20 @@ app.post("/enroll", isAuthenticated, (req, res) => {
       throw err
     }
 
+    // Kurs kaydı bildirimi SNS ile gönder
+    db.query("SELECT course_name FROM courses WHERE id = ?", [courseId], (err, results) => {
+      if (!err && results.length > 0) {
+        try {
+          snsService.sendNotification(
+            `Öğrenci ${req.session.user.fullName} (${req.session.user.username}), ${results[0].course_name} dersine kaydoldu.`,
+            "Kurs Kaydı",
+          )
+        } catch (error) {
+          console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+        }
+      }
+    })
+
     res.redirect("/dashboard")
   })
 })
@@ -229,6 +373,21 @@ app.post("/mark-attendance", isAuthenticated, (req, res) => {
     [studentId, courseId, today],
     (err) => {
       if (err) throw err
+
+      // Yoklama bildirimi SNS ile gönder
+      db.query("SELECT course_name FROM courses WHERE id = ?", [courseId], (err, results) => {
+        if (!err && results.length > 0) {
+          try {
+            snsService.sendNotification(
+              `Öğrenci ${req.session.user.fullName} (${req.session.user.username}), ${results[0].course_name} dersinin yoklamasını aldı.`,
+              "Yoklama Alındı",
+            )
+          } catch (error) {
+            console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+          }
+        }
+      })
+
       res.redirect(`/course/${courseId}`)
     },
   )
@@ -254,6 +413,16 @@ app.post("/create-course", isTeacher, (req, res) => {
           })
         }
         throw err
+      }
+
+      // Yeni kurs bildirimi SNS ile gönder
+      try {
+        snsService.sendNotification(
+          `Öğretmen ${req.session.user.fullName} (${req.session.user.username}) yeni bir ders oluşturdu: ${courseName} (${courseCode})`,
+          "Yeni Ders Oluşturuldu",
+        )
+      } catch (error) {
+        console.error("SNS bildirimi gönderilirken hata oluştu:", error)
       }
 
       res.redirect("/dashboard")
@@ -283,10 +452,19 @@ app.get("/attendance-report/:courseId", isTeacher, (req, res) => {
       (err, attendanceRecords) => {
         if (err) throw err
 
+        // Rapor oluşturuldu bildirimi SNS ile gönder
+        try {
+          snsService.sendNotification(
+            `Öğretmen ${req.session.user.fullName} (${req.session.user.username}) ${course.course_name} dersi için yoklama raporu görüntüledi.`,
+            "Yoklama Raporu Görüntülendi",
+          )
+        } catch (error) {
+          console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+        }
+
         res.render("attendance-report", {
           user: req.session.user,
           course,
-          courseId,
           attendanceRecords,
         })
       },
@@ -294,11 +472,52 @@ app.get("/attendance-report/:courseId", isTeacher, (req, res) => {
   })
 })
 
+
 app.get("/logout", (req, res) => {
+  // Çıkış bildirimi SNS ile gönder
+  if (req.session.user) {
+    try {
+      snsService.sendNotification(
+        `Kullanıcı ${req.session.user.fullName} (${req.session.user.username}) sistemden çıkış yaptı.`,
+        "Kullanıcı Çıkışı",
+      )
+    } catch (error) {
+      console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+    }
+  }
+
   req.session.destroy()
   res.redirect("/login")
 })
 
+// AWS S3 statik dosya yükleme endpoint'i
+app.get("/upload-static-to-s3", isAuthenticated, isTeacher, async (req, res) => {
+  try {
+    const uploadedFiles = await s3Service.uploadStaticFiles(path.join(__dirname, "public"), "static")
+    res.json({ success: true, uploadedFiles })
+  } catch (error) {
+    console.error("Statik dosyalar yüklenirken hata oluştu:", error)
+    res.status(500).json({ error: "Statik dosyalar yüklenirken hata oluştu" })
+  }
+})
+
+// EC2 instance metadata endpoint'i
+app.get("/instance-info", isAuthenticated, async (req, res) => {
+  try {
+    const response = await fetch("http://169.254.169.254/latest/meta-data/instance-id")
+    const instanceId = await response.text()
+
+    const response2 = await fetch("http://169.254.169.254/latest/meta-data/placement/availability-zone")
+    const availabilityZone = await response2.text()
+
+    res.json({ instanceId, availabilityZone })
+  } catch (error) {
+    console.error("EC2 instance bilgileri alınırken hata oluştu:", error)
+    res.json({ error: "EC2 instance bilgileri alınamadı", message: "Bu muhtemelen EC2 üzerinde çalışmıyor" })
+  }
+})
+
+// Uygulama başlatma
 app.listen(port, () => {
   console.log(`Attendance system running on http://localhost:${port}`)
 })

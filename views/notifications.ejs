@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bildirimlerim - Fırat Üniversitesi Online Yoklama Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .notification {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      background-color: white;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .notification.unread {
+      border-left: 4px solid #0056b3;
+      background-color: #f0f7ff;
+    }
+    
+    .notification-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .notification-title {
+      font-weight: 600;
+      color: #003366;
+    }
+    
+    .notification-date {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    
+    .notification-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <main class="container">
+    <div class="dashboard-card">
+      <h1>Bildirimlerim</h1>
+      
+      <% if (notifications.length === 0) { %>
+        <p>Henüz bildiriminiz bulunmamaktadır.</p>
+      <% } else { %>
+        <% notifications.forEach(notification => { %>
+          <div class="notification <%= notification.is_read ? '' : 'unread' %>">
+            <div class="notification-header">
+              <h3 class="notification-title"><%= notification.title %></h3>
+              <span class="notification-date"><%= new Date(notification.created_at).toLocaleDateString('tr-TR') %></span>
+            </div>
+            
+            <p><%= notification.message %></p>
+            
+            <div class="notification-actions">
+              <% if (!notification.is_read) { %>
+                <form action="/notifications/<%= notification.id %>/read" method="POST">
+                  <button type="submit" class="btn small">Okundu İşaretle</button>
+                </form>
+              <% } %>
+              
+              <form action="/notifications/<%= notification.id %>/delete" method="POST">
+                <button type="submit" class="btn secondary small">Sil</button>
+              </form>
+            </div>
+          </div>
+        <% }); %>
+      <% } %>
+    </div>
+  </main>
+  
+  <%- include('partials/footer') %>
+</body>
+</html>
