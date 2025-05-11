@@ -42,10 +42,14 @@ class S3Service {
         Key: key,
         Body: content,
         ContentType: contentType,
+        // ACL: "public-read" kaldırıldı - bucket ACL'lere izin vermiyor
       })
 
       await s3Client.send(command)
-      return `https://${S3_BUCKET_NAME}.s3.amazonaws.com/${key}`
+
+      // Dosyaya erişim için imzalı URL oluştur (1 gün geçerli)
+      const signedUrl = await this.getSignedUrl(key, 86400) // 24 saat = 86400 saniye
+      return signedUrl
     } catch (error) {
       console.error(`S3'e dosya yüklenirken hata oluştu: ${error.message}`)
       throw error
@@ -140,6 +144,10 @@ class S3Service {
       ".gif": "image/gif",
       ".svg": "image/svg+xml",
       ".ico": "image/x-icon",
+      ".csv": "text/csv",
+      ".pdf": "application/pdf",
+      ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
 
     return contentTypes[ext] || "application/octet-stream"

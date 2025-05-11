@@ -1,5 +1,5 @@
 const { PublishCommand, CreateTopicCommand, SubscribeCommand } = require("@aws-sdk/client-sns")
-const { snsClient, SNS_TOPIC_ARN } = require("../aws-config")
+const { snsClient } = require("../aws-config")
 
 /**
  * SNS servisini yöneten sınıf
@@ -16,7 +16,7 @@ class SNSService {
       const params = {
         Message: message,
         Subject: subject,
-        TopicArn: SNS_TOPIC_ARN,
+        TopicArn: process.env.SNS_TOPIC_ARN || process.env.SNS_GENERAL_TOPIC_ARN,
       }
 
       const command = new PublishCommand(params)
@@ -71,6 +71,49 @@ class SNSService {
       console.error(`SNS aboneliği oluşturulurken hata oluştu: ${error.message}`)
       throw error
     }
+  }
+
+  /**
+   * Email adresini SNS'e abone eder
+   * @param {string} email - Email adresi
+   * @returns {Promise<string>} - Abonelik ARN
+   */
+  async subscribeEmail(email) {
+    try {
+      const topicArn = process.env.SNS_TOPIC_ARN || process.env.SNS_GENERAL_TOPIC_ARN
+      if (!topicArn) {
+        throw new Error("SNS Topic ARN bulunamadı")
+      }
+
+      return await this.subscribe(topicArn, "email", email)
+    } catch (error) {
+      console.error(`Email aboneliği oluşturulurken hata oluştu: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * Bildirimi veritabanına kaydeder
+   * @param {number} userId - Kullanıcı ID
+   * @param {string} title - Bildirim başlığı
+   * @param {string} message - Bildirim mesajı
+   * @param {object} db - Veritabanı bağlantısı
+   * @returns {Promise<number>} - Eklenen bildirim ID'si
+   */
+  async saveNotificationToDb(userId, title, message, db) {
+    return new Promise((resolve, reject) => {
+      db.query(
+        "INSERT INTO notifications (user_id, title, message, is_read, created_at) VALUES (?, ?, ?, FALSE, NOW())",
+        [userId, title, message],
+        (err, result) => {
+          if (err) {
+            console.error(`Bildirim veritabanına kaydedilirken hata oluştu: ${err.message}`)
+            return reject(err)
+          }
+          resolve(result.insertId)
+        },
+      )
+    })
   }
 
   /**

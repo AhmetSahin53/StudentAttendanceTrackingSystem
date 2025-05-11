@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bildirimlerim - Fırat Üniversitesi Online Yoklama Sistemi</title>
+  <title>Bildirimlerim - Kocaeli Üniversitesi Online Yoklama Sistemi</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     .notification {
@@ -42,6 +42,25 @@
       gap: 0.5rem;
       margin-top: 1rem;
     }
+    
+    .notification-badge {
+      display: inline-block;
+      background-color: #0056b3;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      text-align: center;
+      line-height: 20px;
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+    }
+    
+    .notification-empty {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -49,16 +68,26 @@
   
   <main class="container">
     <div class="dashboard-card">
-      <h1>Bildirimlerim</h1>
+      <div class="notification-header">
+        <h1>Bildirimlerim <% if (notifications.filter(n => !n.is_read).length > 0) { %><span class="notification-badge"><%= notifications.filter(n => !n.is_read).length %></span><% } %></h1>
+        
+        <% if (notifications.length > 0) { %>
+          <form action="/notifications/read-all" method="POST">
+            <button type="submit" class="btn secondary small">Tümünü Okundu İşaretle</button>
+          </form>
+        <% } %>
+      </div>
       
       <% if (notifications.length === 0) { %>
-        <p>Henüz bildiriminiz bulunmamaktadır.</p>
+        <div class="notification-empty">
+          <p>Henüz bildiriminiz bulunmamaktadır.</p>
+        </div>
       <% } else { %>
         <% notifications.forEach(notification => { %>
           <div class="notification <%= notification.is_read ? '' : 'unread' %>">
             <div class="notification-header">
               <h3 class="notification-title"><%= notification.title %></h3>
-              <span class="notification-date"><%= new Date(notification.created_at).toLocaleDateString('tr-TR') %></span>
+              <span class="notification-date"><%= new Date(notification.created_at).toLocaleString('tr-TR') %></span>
             </div>
             
             <p><%= notification.message %></p>

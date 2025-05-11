@@ -3,7 +3,11 @@ const mysql = require("mysql2")
 const session = require("express-session")
 const bcrypt = require("bcrypt")
 const path = require("path")
-require('dotenv').config();
+require("dotenv").config()
+const PDFDocument = require("pdfkit")
+console.log("AWS_REGION:", process.env.AWS_REGION)
+console.log("SNS_GENERAL_TOPIC_ARN:", process.env.SNS_GENERAL_TOPIC_ARN)
+console.log("SNS_TOPIC_ARN:", process.env.SNS_TOPIC_ARN)
 const app = express()
 const port = process.env.PORT || 4000
 
@@ -67,6 +71,27 @@ db.connect((err) => {
   db.query(createUsersTable, (err) => {
     if (err) throw err
     console.log("Users table created or already exists")
+
+    // Create notifications table
+    const createNotificationsTable = `
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `
+
+    db.query(createNotificationsTable, (err) => {
+      if (err) {
+        console.error("Error creating notifications table:", err)
+      } else {
+        console.log("Notifications table created or already exists")
+      }
+    })
 
     // Create courses table
     const createCoursesTable = `
@@ -179,6 +204,11 @@ app.post("/login", (req, res) => {
 
     // Kullanıcı girişi bildirimini SNS ile gönder
     try {
+      console.log("SNS Params:", {
+        Message: `Kullanıcı ${user.full_name} (${user.username}) sisteme giriş yaptı.`,
+        Subject: "Kullanıcı Girişi",
+        TopicArn: process.env.SNS_TOPIC_ARN || process.env.SNS_GENERAL_TOPIC_ARN,
+      })
       await snsService.sendNotification(
         `Kullanıcı ${user.full_name} (${user.username}) sisteme giriş yaptı.`,
         "Kullanıcı Girişi",
@@ -196,10 +226,10 @@ app.get("/register", (req, res) => {
 })
 
 app.post("/register", async (req, res) => {
-  const { username, password, fullName, role, email } = req.body;
+  const { username, password, fullName, role, email } = req.body
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10)
 
     db.query(
       "INSERT INTO users (username, password, full_name, role, email) VALUES (?, ?, ?, ?, ?)",
@@ -207,50 +237,50 @@ app.post("/register", async (req, res) => {
       async (err, result) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY") {
-            return res.render("register", { error: "Bu kullanıcı adı veya email zaten kullanılıyor" });
+            return res.render("register", { error: "Bu kullanıcı adı veya email zaten kullanılıyor" })
           }
-          throw err;
+          throw err
         }
 
         // Kullanıcı ID'sini al
-        const userId = result.insertId;
+        const userId = result.insertId
 
         // Email varsa SNS'e abone et
         if (email) {
           try {
-            await snsService.subscribeEmail(email);
-            console.log(`${email} adresi bildirim sistemine abone edildi`);
+            await snsService.subscribeEmail(email)
+            console.log(`${email} adresi bildirim sistemine abone edildi`)
           } catch (snsError) {
-            console.error("SNS aboneliği sırasında hata:", snsError);
+            console.error("SNS aboneliği sırasında hata:", snsError)
             // Abonelik hatası kullanıcı kaydını engellememelidir
           }
         }
 
         // Bildirim oluştur ve veritabanına kaydet
         try {
-          const notificationTitle = "Hoş Geldiniz";
-          const notificationMessage = `Sayın ${fullName}, Kocaeli Üniversitesi Online Yoklama Sistemine hoş geldiniz!`;
-          
+          const notificationTitle = "Hoş Geldiniz"
+          const notificationMessage = `Sayın ${fullName}, Kocaeli Üniversitesi Online Yoklama Sistemine hoş geldiniz!`
+
           // Veritabanına bildirim kaydet
-          await snsService.saveNotificationToDb(userId, notificationTitle, notificationMessage, db);
-          
+          await snsService.saveNotificationToDb(userId, notificationTitle, notificationMessage, db)
+
           // SNS ile bildirim gönder (admin için)
           await snsService.sendNotification(
             `Yeni kullanıcı kaydı: ${fullName} (${username}) - Rol: ${role}`,
-            "Yeni Kullanıcı Kaydı"
-          );
+            "Yeni Kullanıcı Kaydı",
+          )
         } catch (notifError) {
-          console.error("Bildirim oluşturulurken hata:", notifError);
+          console.error("Bildirim oluşturulurken hata:", notifError)
         }
 
-        res.redirect("/login");
-      }
-    );
+        res.redirect("/login")
+      },
+    )
   } catch (err) {
-    console.error("Kayıt işlemi sırasında hata:", err);
-    res.render("register", { error: "Kayıt sırasında bir hata oluştu" });
+    console.error("Kayıt işlemi sırasında hata:", err)
+    res.render("register", { error: "Kayıt sırasında bir hata oluştu" })
   }
-});
+})
 
 app.get("/dashboard", isAuthenticated, (req, res) => {
   const user = req.session.user
@@ -430,48 +460,77 @@ app.post("/create-course", isTeacher, (req, res) => {
   )
 })
 
-app.get("/attendance-report/:courseId", isTeacher, (req, res) => {
+app.get("/attendance-report/:courseId", isTeacher, async (req, res) => {
   const courseId = req.params.courseId
 
-  db.query(`SELECT c.course_name FROM courses c WHERE c.id = ?`, [courseId], (err, courseResults) => {
-    if (err) throw err
+  try {
+    // Önce PDF raporu oluştur ve S3'e yükle
+    const pdfUrl = await reportService.generatePDFReport(courseId)
 
-    if (courseResults.length === 0) {
-      return res.status(404).render("error", { message: "Kurs bulunamadı" })
-    }
+    db.query(`SELECT * FROM courses WHERE id = ?`, [courseId], (err, courseResults) => {
+      if (err) throw err
 
-    const course = courseResults[0]
+      if (courseResults.length === 0) {
+        return res.status(404).render("error", { message: "Kurs bulunamadı" })
+      }
 
-    db.query(
-      `SELECT u.full_name, a.date, a.status
-         FROM attendance a
-         JOIN users u ON a.student_id = u.id
-         WHERE a.course_id = ?
-         ORDER BY a.date DESC, u.full_name`,
-      [courseId],
-      (err, attendanceRecords) => {
-        if (err) throw err
+      const course = courseResults[0]
 
-        // Rapor oluşturuldu bildirimi SNS ile gönder
-        try {
-          snsService.sendNotification(
-            `Öğretmen ${req.session.user.fullName} (${req.session.user.username}) ${course.course_name} dersi için yoklama raporu görüntüledi.`,
-            "Yoklama Raporu Görüntülendi",
-          )
-        } catch (error) {
-          console.error("SNS bildirimi gönderilirken hata oluştu:", error)
-        }
+      db.query(
+        `SELECT u.full_name, a.date, a.status
+           FROM attendance a
+           JOIN users u ON a.student_id = u.id
+           WHERE a.course_id = ?
+           ORDER BY a.date DESC, u.full_name`,
+        [courseId],
+        (err, attendanceRecords) => {
+          if (err) throw err
 
-        res.render("attendance-report", {
-          user: req.session.user,
-          course,
-          attendanceRecords,
-        })
-      },
-    )
-  })
+          // Rapor oluşturuldu bildirimi SNS ile gönder
+          try {
+            snsService.sendNotification(
+              `Öğretmen ${req.session.user.fullName} (${req.session.user.username}) ${course.course_name} dersi için yoklama raporu görüntüledi.`,
+              "Yoklama Raporu Görüntülendi",
+            )
+          } catch (error) {
+            console.error("SNS bildirimi gönderilirken hata oluştu:", error)
+          }
+
+          res.render("attendance-report", {
+            user: req.session.user,
+            course,
+            attendanceRecords,
+            pdfUrl, // PDF dosyasının URL'ini şablona aktar
+          })
+        },
+      )
+    })
+  } catch (error) {
+    console.error("Rapor oluşturulurken hata:", error)
+    res.status(500).render("error", {
+      message: "Rapor oluşturulurken bir hata oluştu: " + error.message,
+      user: req.session.user,
+    })
+  }
 })
 
+// CSV raporu indirme bağlantısı
+app.get("/download-report/:courseId", isTeacher, async (req, res) => {
+  const courseId = req.params.courseId
+
+  try {
+    const pdfUrl = await reportService.generatePDFReport(courseId)
+
+    // Kullanıcıyı S3'teki PDF dosyasına yönlendir
+    res.redirect(pdfUrl)
+  } catch (error) {
+    console.error("Rapor indirme hatası:", error)
+    res.status(500).render("error", {
+      message: "Rapor indirme sırasında bir hata oluştu: " + error.message,
+      user: req.session.user,
+    })
+  }
+})
 
 app.get("/logout", (req, res) => {
   // Çıkış bildirimi SNS ile gönder
@@ -516,6 +575,9 @@ app.get("/instance-info", isAuthenticated, async (req, res) => {
     res.json({ error: "EC2 instance bilgileri alınamadı", message: "Bu muhtemelen EC2 üzerinde çalışmıyor" })
   }
 })
+
+// Veritabanını route'larda kullanabilmek için
+app.locals.db = db
 
 // Uygulama başlatma
 app.listen(port, () => {

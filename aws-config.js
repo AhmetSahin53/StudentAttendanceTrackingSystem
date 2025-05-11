@@ -1,10 +1,10 @@
-// AWS SDK for JavaScript v3
+// aws-config.js dosyasını şu şekilde güncelleyin
 const { S3Client } = require("@aws-sdk/client-s3")
 const { SNSClient } = require("@aws-sdk/client-sns")
 const { RDSClient } = require("@aws-sdk/client-rds")
 
 // AWS Region
-const AWS_REGION = process.env.AWS_REGION || "eu-central-1" // Varsayılan bölge
+const AWS_REGION = process.env.AWS_REGION || "us-east-1" // Varsayılan bölge
 
 // AWS Credentials
 const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID
@@ -38,10 +38,13 @@ const rdsClient = new RDSClient({
 })
 
 // S3 Bucket Name
-const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || "firat-attendance-system-assets"
+const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME 
 
-// SNS Topic ARN for notifications
-const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN || "arn:aws:sns:eu-central-1:123456789012:attendance-notifications"
+// SNS Topic ARNs
+const SNS_GENERAL_TOPIC_ARN = process.env.SNS_GENERAL_TOPIC_ARN
+const SNS_ADMIN_TOPIC_ARN = process.env.SNS_ADMIN_TOPIC_ARN || SNS_GENERAL_TOPIC_ARN
+const SNS_DEFAULT_TOPIC_ARN = process.env.SNS_DEFAULT_TOPIC_ARN || SNS_GENERAL_TOPIC_ARN
+const SNS_TOPIC_ARN = process.env.SNS_GENERAL_TOPIC_ARN // Geriye dönük uyumluluk için
 
 module.exports = {
   s3Client,
@@ -49,5 +52,8 @@ module.exports = {
   rdsClient,
   S3_BUCKET_NAME,
   SNS_TOPIC_ARN,
+  SNS_GENERAL_TOPIC_ARN,
+  SNS_ADMIN_TOPIC_ARN,
+  SNS_DEFAULT_TOPIC_ARN,
   AWS_REGION,
 }

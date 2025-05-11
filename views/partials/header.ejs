@@ -7,17 +7,18 @@
     </div>
     
     <nav class="main-nav">
-      <ul>
-        <% if (typeof user !== 'undefined' && user) { %>
-          <li><a href="/dashboard">Panel</a></li>
-          <li><a href="/courses">Dersler</a></li>
-          <li><a href="/notifications">Bildirimler</a></li>
-          <li><a href="/logout">Çıkış Yap</a></li>
-        <% } else { %>
-          <li><a href="/login">Giriş Yap</a></li>
-          <li><a href="/register">Kayıt Ol</a></li>
-        <% } %>
-      </ul>
-    </nav>
+    <ul>
+      <li><a href="/">Ana Sayfa</a></li>
+      
+      <% if (typeof user !== 'undefined' && user) { %>
+        <li><a href="/dashboard">Panel</a></li>
+        <li><a href="/courses">Dersler</a></li>
+        <li><a href="/logout">Çıkış Yap</a></li>
+      <% } else { %>
+        <li><a href="/login">Giriş Yap</a></li>
+        <li><a href="/register">Kayıt Ol</a></li>
+      <% } %>
+    </ul>
+  </nav>
   </div>
 </header>
